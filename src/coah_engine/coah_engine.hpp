@@ -8,6 +8,7 @@
 #include <cstring>
 #include <chrono>
 
+#include "vulkan/window.hpp"
 #include "vulkan/vulkan_context.hpp"
 #include "vulkan/swapchain.hpp"
 #include "vulkan/renderer.hpp"
@@ -17,64 +18,35 @@
 
 class CoahEngine {
 public:
+    CoahEngine() 
+        : window_(WIDTH, HEIGHT, "coah")
+        , ctx_(window_)
+        , swapchain_(ctx_)
+        , renderer_(ctx_, swapchain_)
+        , inputManager_(window_)
+        , coah_(renderer_, inputManager_)
+    {}
+
     void run() {
-        initWindow();
-        initVulkan();
-        inputManager.init(window);
-        loop();
-        cleanup();
-    }
-
-private:
-    GLFWwindow* window = nullptr;
-
-    VulkanContext ctx;
-    Swapchain swapchain;
-    Renderer renderer;
-    CallOfAHero coah;
-    InputManager inputManager;
-
-    void initWindow() {
-        glfwInit();
-        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-        window = glfwCreateWindow(WIDTH, HEIGHT, "coah-engine", nullptr, nullptr);
-
-        glfwSetWindowUserPointer(window, this);
-        glfwSetCursorPosCallback(window, CoahEngine::mouseCallback);
-        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    }
-
-    void initVulkan() {
-        ctx.init(window);
-        swapchain.init(ctx);
-        renderer.init(&ctx, &swapchain);
-        coah.init(&renderer);
-    }
-
-    void loop() {
-        float lastTime = 0.0f;
-        while (!glfwWindowShouldClose(window)) {
+        float lastTime = static_cast<float>(glfwGetTime());
+        while (!glfwWindowShouldClose(window_.get())) {
             float currentTime = glfwGetTime();
             float dt = currentTime - lastTime;
             lastTime = currentTime;
 
             glfwPollEvents();
-            coah.update(&inputManager, dt);
-            coah.render();
+            inputManager_.update();
+            coah_.update(dt);
+            coah_.render();
         }
-        vkDeviceWaitIdle(ctx.device);
+        vkDeviceWaitIdle(ctx_.device);
     }
 
-    static void mouseCallback(GLFWwindow* window, double xpos, double ypos) {
-        CoahEngine* e = static_cast<CoahEngine*>(glfwGetWindowUserPointer(window));
-        e->coah.player.onMouseMove(xpos, ypos);
-    }
-
-    void cleanup() {
-        renderer.cleanup();
-        swapchain.cleanup(ctx);
-        glfwDestroyWindow(window);
-        glfwTerminate();
-    }
+private:
+    Window         window_;
+    VulkanContext  ctx_;
+    Swapchain      swapchain_;
+    Renderer       renderer_;
+    InputManager   inputManager_;
+    CallOfAHero    coah_;
 };

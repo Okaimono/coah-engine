@@ -17,29 +17,21 @@ public:
     float lastY       = HEIGHT / 2.0f;
     bool firstMouse   = true;
 
-    void processInput(InputManager* input, float dt) {
-        if (input->keyPressed(GLFW_KEY_W))          position += speed * dt * orientation;
-        if (input->keyPressed(GLFW_KEY_S))          position -= speed * dt * orientation;
-        if (input->keyPressed(GLFW_KEY_A))          position -= glm::normalize(glm::cross(orientation, up)) * speed * dt;
-        if (input->keyPressed(GLFW_KEY_D))          position += glm::normalize(glm::cross(orientation, up)) * speed * dt;
-        if (input->keyPressed(GLFW_KEY_SPACE))      position += up * speed * dt;
-        if (input->keyPressed(GLFW_KEY_LEFT_SHIFT)) position -= up * speed * dt;
+    void processInput(InputManager& input, float dt) {
+        onMouseMove(input.mouseDeltaX(), input.mouseDeltaY());
+        if (input.keyPressed(GLFW_KEY_W))          position += speed * dt * orientation;
+        if (input.keyPressed(GLFW_KEY_S))          position -= speed * dt * orientation;
+        if (input.keyPressed(GLFW_KEY_A))          position -= glm::normalize(glm::cross(orientation, up)) * speed * dt;
+        if (input.keyPressed(GLFW_KEY_D))          position += glm::normalize(glm::cross(orientation, up)) * speed * dt;
+        if (input.keyPressed(GLFW_KEY_SPACE))      position += up * speed * dt;
+        if (input.keyPressed(GLFW_KEY_LEFT_SHIFT)) position -= up * speed * dt;
     }
 
-    void onMouseMove(double xpos, double ypos) {
-        if (firstMouse) {
-            lastX = xpos;
-            lastY = ypos;
-            firstMouse = false;
-        }
+    void onMouseMove(double dx, double dy) {
+        if (dx == 0.0 && dy == 0.0) return;   // mouse didn't move — skip everything below
 
-        float dx = (xpos - lastX) * sensitivity;
-        float dy = (lastY - ypos) * sensitivity;
-        lastX = xpos;
-        lastY = ypos;
-
-        yaw   += dx;
-        pitch  = glm::clamp(pitch + dy, -89.0f, 89.0f);
+        yaw   += static_cast<float>(dx) * sensitivity;
+        pitch  = glm::clamp(pitch + static_cast<float>(-dy) * sensitivity, -89.0f, 89.0f);
 
         orientation = glm::normalize(glm::vec3(
             cos(glm::radians(yaw)) * cos(glm::radians(pitch)),

@@ -7,33 +7,32 @@ public:
     World world;
     Player player;
 
-    Renderer* renderer;
-
-    void init(Renderer* renderer) {
-        this->renderer = renderer;
-        world.init();
+    CallOfAHero(Renderer& renderer, InputManager& inputManager) 
+        : renderer_(renderer)
+        , inputManager_(inputManager)
+    {
         createChunkSlots();
     }
 
-    void update(InputManager* inputManager, float dt) {
-        player.processInput(inputManager, dt);
+    void update(float dt) {
+        player.processInput(inputManager_, dt);
     }
 
     void render() {
         glm::mat4 view = player.getViewMatrix();
         glm::mat4 proj = player.getProjectionMatrix();
-        renderer->updateUniformBuffer(view, proj);
+        renderer_.updateUniformBuffer(view, proj);
 
-        renderer->drawFrame(world);
+        renderer_.drawFrame(world);
     }
 
+private:
+    Renderer&     renderer_;
+    InputManager& inputManager_;
+
     void createChunkSlots() {
-        std::unordered_map<ChunkCoord, Chunk, ChunkCoordHash>& worldGrid = world.worldGrid;
-        for (auto& [key, value] : worldGrid) {
-            value.slot = renderer->allocator.reserveSlot();
-            
-            const std::vector<uint32_t>& data = value.faces;
-            renderer->allocator.updateSlot(value.slot, data);
+        for (auto& [key, value] : world.worldGrid) {
+            value.slot = renderer_.reserveChunkSlot(value.faces);
         }
     }
 };

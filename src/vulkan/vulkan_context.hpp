@@ -1,5 +1,6 @@
 #pragma once
 #include "vulkan_includes.hpp"
+#include "vulkan/window.hpp"
 
 const std::vector<const char*> validationLayers = {
     "VK_LAYER_KHRONOS_validation"
@@ -19,16 +20,16 @@ public:
     VkDevice     device         = VK_NULL_HANDLE;
     VkQueue      graphicsQueue  = VK_NULL_HANDLE;
 
-    const std::vector<const char*> deviceExtensions = {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME
-    };
-
-    void init(GLFWwindow* window) {
+    VulkanContext(Window& window) {
         createInstance();
         createSurface(window);
         pickPhysicalDevice();
         createLogicalDevice();
     }
+
+    const std::vector<const char*> deviceExtensions = {
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME
+    };
 
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
         VkPhysicalDeviceMemoryProperties memProps;
@@ -71,8 +72,8 @@ private:
         std::cout << "instance created\n";
     }
 
-    void createSurface(GLFWwindow* window) {
-        if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS)
+    void createSurface(Window& window) {
+        if (glfwCreateWindowSurface(instance, window.get(), nullptr, &surface) != VK_SUCCESS)
             throw std::runtime_error("failed to create surface");
     }
 

@@ -9,21 +9,34 @@ public:
     VkExtent2D swapchainExtent;
     std::vector<VkImageView> imageViews;
 
-    void init(VulkanContext& ctx) {
-        createSwapchain(ctx);
-        createImageViews(ctx);
+    Swapchain(VulkanContext& ctx) 
+        : ctx_(ctx)
+    {
+        createSwapchain();
+        createImageViews();
     }
 
-    void createSwapchain(VulkanContext& ctx) {
+    ~Swapchain() {
+        for (auto iv : imageViews) vkDestroyImageView(ctx_.device, iv, nullptr);
+        vkDestroySwapchainKHR(ctx_.device, swapchain, nullptr);
+    }
+
+    Swapchain(const Swapchain&) = delete;
+    Swapchain& operator=(const Swapchain&) = delete;
+
+private:
+    VulkanContext& ctx_;
+
+    void createSwapchain() {
         VkSurfaceCapabilitiesKHR caps;
-        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(ctx.physicalDevice, ctx.surface, &caps);
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(ctx_.physicalDevice, ctx_.surface, &caps);
 
         swapchainFormat = VK_FORMAT_B8G8R8A8_SRGB;
         swapchainExtent = caps.currentExtent;
 
         VkSwapchainCreateInfoKHR info{};
         info.sType            = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-        info.surface          = ctx.surface;
+        info.surface          = ctx_.surface;
         info.minImageCount    = caps.minImageCount + 1;
         info.imageFormat      = swapchainFormat;
         info.imageColorSpace  = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
@@ -36,17 +49,17 @@ public:
         info.presentMode      = VK_PRESENT_MODE_FIFO_KHR;
         info.clipped          = VK_TRUE;
 
-        if (vkCreateSwapchainKHR(ctx.device, &info, nullptr, &swapchain) != VK_SUCCESS)
+        if (vkCreateSwapchainKHR(ctx_.device, &info, nullptr, &swapchain) != VK_SUCCESS)
             throw std::runtime_error("failed to create swapchain");
 
         uint32_t count;
-        vkGetSwapchainImagesKHR(ctx.device, swapchain, &count, nullptr);
+        vkGetSwapchainImagesKHR(ctx_.device, swapchain, &count, nullptr);
         swapchainImages.resize(count);
-        vkGetSwapchainImagesKHR(ctx.device, swapchain, &count, swapchainImages.data());
+        vkGetSwapchainImagesKHR(ctx_.device, swapchain, &count, swapchainImages.data());
         std::cout << "swapchain created\n";
     }
 
-    void createImageViews(VulkanContext& ctx) {
+    void createImageViews() {
         imageViews.resize(swapchainImages.size());
         for (size_t i = 0; i < swapchainImages.size(); i++) {
             VkImageViewCreateInfo info{};
@@ -57,12 +70,7 @@ public:
             info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
             info.subresourceRange.levelCount = 1;
             info.subresourceRange.layerCount = 1;
-            vkCreateImageView(ctx.device, &info, nullptr, &imageViews[i]);
+            vkCreateImageView(ctx_.device, &info, nullptr, &imageViews[i]);
         }
-    }
-
-    void cleanup(VulkanContext& ctx) {
-        for (auto iv : imageViews) vkDestroyImageView(ctx.device, iv, nullptr);
-        vkDestroySwapchainKHR(ctx.device, swapchain, nullptr);
     }
 };
