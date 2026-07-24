@@ -42,7 +42,6 @@ public:
     Chunk(int chunkX, int chunkZ, float* noise) {
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
-
                 float n = noise[x * 16 + z]; // -1 to 1
                 int surfaceY = (int)((n + 1.0f) * 0.5f * 24) + 4; // 4..28
                 surfaceY = glm::clamp(surfaceY, 1, 31);
@@ -57,8 +56,7 @@ public:
         }
         buildMesh();
     }
-
-private:
+    
     void buildMesh() {
         faces.clear();
         for (int x = 0; x < 16; x++) {
@@ -82,6 +80,7 @@ private:
         faces.resize(50000, 0);
     }
 
+private:
     bool isSolid(int face, const glm::ivec3& position) {
         glm::ivec3 n = position + adjacentSide[face];
         if (n.x < 0 || n.x >= 16 ||

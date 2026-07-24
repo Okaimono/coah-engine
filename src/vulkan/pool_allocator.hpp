@@ -7,7 +7,7 @@
 
 struct Slot {
     static constexpr VkDeviceSize slotSize = sizeof(uint32_t) * 50000;
-    VkDeviceSize slotOffset;
+    VkDeviceSize slotOffset = -1;
 };
 
 class PoolAllocator {
@@ -17,11 +17,24 @@ public:
     VkBuffer ssboBuffer = VK_NULL_HANDLE;
     VkDeviceMemory ssboMemory = VK_NULL_HANDLE;
 
-    void init(VulkanContext* ctx, CommandManager* commandManager) {
-        this->ctx = ctx;
-        this->commandManager = commandManager;
+    PoolAllocator(VulkanContext& ctx, CommandManager& commandManager)
+        : ctx_(ctx)
+        , commandManager_(commandManager)
+    {
         createSSBO();
     }
+
+    ~PoolAllocator() {
+        if (ssboBuffer != VK_NULL_HANDLE) {
+            vkDestroyBuffer(ctx_.device, ssboBuffer, nullptr);
+        }
+        if (ssboMemory != VK_NULL_HANDLE) {
+            vkFreeMemory(ctx_.device, ssboMemory, nullptr);
+        }
+    }
+
+    PoolAllocator(const PoolAllocator&) = delete;
+    PoolAllocator& operator=(const PoolAllocator&) = delete;
 
     Slot reserveSlot() {
         Slot slot;
@@ -41,30 +54,29 @@ public:
         VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
 
         const VkDeviceSize stagingPoolSize = newData.size() * sizeof(uint32_t);
-        createBuffer(stagingPoolSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+        createBuffer(stagingPoolSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
             stagingBuffer, stagingMemory);
 
         void* data;
-        vkMapMemory(ctx->device, stagingMemory, 0, VK_WHOLE_SIZE, 0, &data);
+        vkMapMemory(ctx_.device, stagingMemory, 0, VK_WHOLE_SIZE, 0, &data);
         memcpy(data, newData.data(), newData.size() * sizeof(uint32_t));
-        vkUnmapMemory(ctx->device, stagingMemory);
-        
-        VkCommandBuffer cmd = commandManager->beginOneShot();
+        vkUnmapMemory(ctx_.device, stagingMemory);
+        VkCommandBuffer cmd = commandManager_.beginOneShot();
         VkBufferCopy copy{};
         copy.srcOffset = 0;
         copy.dstOffset = slot.slotOffset;
         copy.size = newData.size() * sizeof(uint32_t);
         vkCmdCopyBuffer(cmd, stagingBuffer, ssboBuffer, 1, &copy);
-        commandManager->endOneShot(cmd);
+        commandManager_.endOneShot(cmd);
 
-        vkDestroyBuffer(ctx->device, stagingBuffer, nullptr);
-        vkFreeMemory(ctx->device, stagingMemory, nullptr);
+        vkDestroyBuffer(ctx_.device, stagingBuffer, nullptr);
+        vkFreeMemory(ctx_.device, stagingMemory, nullptr);
     }
 
 private:
-    VulkanContext* ctx = nullptr;
-    CommandManager* commandManager = nullptr;
+    VulkanContext& ctx_;
+    CommandManager& commandManager_;
 
     VkDeviceSize ssboOffset = 0;
 
@@ -76,23 +88,23 @@ private:
     }
 
     void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
-                      VkMemoryPropertyFlags properties,
-                      VkBuffer& buffer, VkDeviceMemory& memory) {
+        VkMemoryPropertyFlags properties,
+        VkBuffer& buffer, VkDeviceMemory& memory) {
         VkBufferCreateInfo info{};
         info.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         info.size        = size;
         info.usage       = usage;
         info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        vkCreateBuffer(ctx->device, &info, nullptr, &buffer);
+        vkCreateBuffer(ctx_.device, &info, nullptr, &buffer);
 
         VkMemoryRequirements memReqs;
-        vkGetBufferMemoryRequirements(ctx->device, buffer, &memReqs);
+        vkGetBufferMemoryRequirements(ctx_.device, buffer, &memReqs);
 
         VkMemoryAllocateInfo allocInfo{};
         allocInfo.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocInfo.allocationSize  = memReqs.size;
-        allocInfo.memoryTypeIndex = ctx->findMemoryType(memReqs.memoryTypeBits, properties);
-        vkAllocateMemory(ctx->device, &allocInfo, nullptr, &memory);
-        vkBindBufferMemory(ctx->device, buffer, memory, 0);
+        allocInfo.memoryTypeIndex = ctx_.findMemoryType(memReqs.memoryTypeBits, properties);
+        vkAllocateMemory(ctx_.device, &allocInfo, nullptr, &memory);
+        vkBindBufferMemory(ctx_.device, buffer, memory, 0);
     }
 };

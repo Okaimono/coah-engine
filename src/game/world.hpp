@@ -38,6 +38,44 @@ public:
         launchNoiseMap(20, 20, perlin.get());
     }
 
+    void updateBlockAt(const glm::vec3& blockPos, int block) {
+        ChunkCoord coord;
+        coord.x = static_cast<int>(std::floor(blockPos.x / 16.0f));
+        coord.z = static_cast<int>(std::floor(blockPos.z / 16.0f));
+
+        auto it = worldGrid.find(coord);
+        if (it == worldGrid.end()) return;
+
+        Chunk& chunk = it->second;
+
+        int localX = static_cast<int>(blockPos.x) - coord.x * 16;
+        int localY = static_cast<int>(blockPos.y);
+        int localZ = static_cast<int>(blockPos.z) - coord.z * 16;
+
+        if (localY < 0 || localY >= chunk.height) return; 
+
+        chunk.blocks[localX][localY][localZ] = block;
+    }
+
+    int getBlockAt(const glm::vec3& blockPos) {
+        ChunkCoord coord;
+        coord.x = static_cast<int>(std::floor(blockPos.x / 16.0f));
+        coord.z = static_cast<int>(std::floor(blockPos.z / 16.0f));
+
+        auto it = worldGrid.find(coord);
+        if (it == worldGrid.end()) return 0;
+
+        Chunk& chunk = it->second;
+
+        int localX = static_cast<int>(blockPos.x) - coord.x * 16;
+        int localY = static_cast<int>(blockPos.y);
+        int localZ = static_cast<int>(blockPos.z) - coord.z * 16;
+
+        if (localY < 0 || localY >= chunk.height) return 0; 
+
+        return chunk.blocks[localX][localY][localZ];
+    }
+
     // void getRenderChunks(glm::vec3 position) {
     //     for (int x = 0; x <= renderDist; x++) {
     //         for (int z = 0; z <= renderDist; z++) {

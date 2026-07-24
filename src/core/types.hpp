@@ -6,6 +6,10 @@ struct Vertex {
     glm::vec3 color;
 };
 
+struct UIVertex {
+    glm::vec2 pos;
+};
+
 struct UniformBufferObject {
     glm::mat4 view;
     glm::mat4 proj;

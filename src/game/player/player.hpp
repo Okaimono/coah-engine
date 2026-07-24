@@ -8,6 +8,7 @@ public:
     glm::vec3 position    = glm::vec3(0.0f, 0.0f, 0.0f);
     glm::vec3 orientation = glm::vec3(0.0f, 0.0f, -1.0f);
     glm::vec3 up          = glm::vec3(0.0f, 1.0f, 0.0f);
+    
     float speed       = 20.0f;
     float sensitivity = 0.1f;
     float yaw         = -135.0f;

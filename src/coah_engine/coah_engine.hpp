@@ -15,6 +15,7 @@
 #include "core/config.hpp"
 #include "game/coah.hpp"
 #include "coah_engine/input_manager.hpp"
+#include "coah_engine/ui_context.hpp"
 
 class CoahEngine {
 public:
@@ -24,7 +25,7 @@ public:
         , swapchain_(ctx_)
         , renderer_(ctx_, swapchain_)
         , inputManager_(window_)
-        , coah_(renderer_, inputManager_)
+        , coah_(renderer_, inputManager_, uiContext_)
     {}
 
     void run() {
@@ -37,7 +38,10 @@ public:
             glfwPollEvents();
             inputManager_.update();
             coah_.update(dt);
+
+            // Update all renderer data all at once rather than updateUI()
             coah_.render();
+            renderer_.updateUI(uiContext_.getQuadBatch());
         }
         vkDeviceWaitIdle(ctx_.device);
     }
@@ -48,5 +52,6 @@ private:
     Swapchain      swapchain_;
     Renderer       renderer_;
     InputManager   inputManager_;
+    UIContext      uiContext_;
     CallOfAHero    coah_;
 };
