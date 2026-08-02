@@ -3,6 +3,8 @@
 #include "vulkan/vulkan_context.hpp"
 #include "vulkan/swapchain.hpp"
 #include "vulkan/renderer/render_pass.hpp"
+#include "vulkan/command_manager.hpp"
+#include "vulkan/renderer/texture_atlas.hpp"
 #include "core/types.hpp"
 
 #include <vector>
@@ -15,20 +17,30 @@
 
 class UiPipeline {
 public:
-    VkPipeline       pipeline       = VK_NULL_HANDLE;
-    VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+    TextureAtlas atlas_;
+
+    VkPipeline            pipeline            = VK_NULL_HANDLE;
+    VkPipelineLayout      pipelineLayout      = VK_NULL_HANDLE;
+    VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
+    VkDescriptorPool      descriptorPool      = VK_NULL_HANDLE;
+    VkDescriptorSet       descriptorSet       = VK_NULL_HANDLE;
 
     void* mappedPtr_ = nullptr;
     uint32_t vertexCount_ = 0;
     VkBuffer       vertexBuffer = VK_NULL_HANDLE;
     VkDeviceMemory vertexMemory = VK_NULL_HANDLE;
 
-    UiPipeline(VulkanContext& ctx, Swapchain& swapchain, RenderPass& renderPass)
+    UiPipeline(VulkanContext& ctx, Swapchain& swapchain, RenderPass& renderPass, CommandManager& commandManager)
         : ctx_(ctx)
         , swapchain_(swapchain)
         , renderPass_(renderPass)
+        , commandManager_(commandManager)
     {
         createVertexBuffer();
+        createAtlasTexture("assets/textures/items/morning_star.png");
+        createDescriptorSetLayout();
+        createDescriptorPool();
+        createDescriptorSet();
         createPipeline();
     }
 
@@ -80,9 +92,17 @@ private:
     VulkanContext& ctx_;
     Swapchain&     swapchain_;
     RenderPass&    renderPass_;
+    CommandManager& commandManager_;
 
     static constexpr VkDeviceSize kMaxUiVertices = 8192;
     static constexpr VkDeviceSize kUiVertexBufferSize = kMaxUiVertices * sizeof(UIVertex);
+
+    VkImage        defaultTextureImage_  = VK_NULL_HANDLE;
+    VkDeviceMemory defaultTextureMemory_ = VK_NULL_HANDLE;
+    VkImageView    defaultTextureView_   = VK_NULL_HANDLE;
+    VkSampler      defaultSampler_       = VK_NULL_HANDLE;
+
+    uint32_t texW_ = 0, texH_ = 0;
 
     void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
                        VkMemoryPropertyFlags properties,
@@ -126,6 +146,186 @@ private:
         memcpy(mappedPtr_, positions, size);
     }
 
+    void createImage(uint32_t width, uint32_t height, VkFormat format,
+                     VkImageTiling tiling, VkImageUsageFlags usage,
+                     VkMemoryPropertyFlags properties,
+                     VkImage& image, VkDeviceMemory& memory) {
+        VkImageCreateInfo info{};
+        info.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        info.imageType     = VK_IMAGE_TYPE_2D;
+        info.extent        = {width, height, 1};
+        info.mipLevels     = 1;
+        info.arrayLayers   = 1;
+        info.format        = format;
+        info.tiling        = tiling;
+        info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        info.usage         = usage;
+        info.samples       = VK_SAMPLE_COUNT_1_BIT;
+        info.sharingMode   = VK_SHARING_MODE_EXCLUSIVE;
+        vkCreateImage(ctx_.device, &info, nullptr, &image);
+
+        VkMemoryRequirements memReqs;
+        vkGetImageMemoryRequirements(ctx_.device, image, &memReqs);
+
+        VkMemoryAllocateInfo allocInfo{};
+        allocInfo.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        allocInfo.allocationSize  = memReqs.size;
+        allocInfo.memoryTypeIndex = ctx_.findMemoryType(memReqs.memoryTypeBits, properties);
+        vkAllocateMemory(ctx_.device, &allocInfo, nullptr, &memory);
+        vkBindImageMemory(ctx_.device, image, memory, 0);
+    }
+
+    void transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout) {
+        VkCommandBuffer cmd = commandManager_.beginOneShot();
+
+        VkImageMemoryBarrier barrier{};
+        barrier.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrier.oldLayout           = oldLayout;
+        barrier.newLayout           = newLayout;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image               = image;
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        barrier.subresourceRange.levelCount = 1;
+        barrier.subresourceRange.layerCount = 1;
+
+        VkPipelineStageFlags srcStage, dstStage;
+
+        if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
+            newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+            barrier.srcAccessMask = 0;
+            barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+            dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        } else {
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        }
+
+        vkCmdPipelineBarrier(cmd, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+        commandManager_.endOneShot(cmd);
+    }
+
+    void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t w, uint32_t h) {
+        VkCommandBuffer cmd = commandManager_.beginOneShot();
+
+        VkBufferImageCopy region{};
+        region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        region.imageSubresource.layerCount = 1;
+        region.imageExtent                 = {w, h, 1};
+
+        vkCmdCopyBufferToImage(cmd, buffer, image,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+        commandManager_.endOneShot(cmd);
+    }
+
+    void createAtlasTexture(const std::string& path) {
+        int texW, texH, texChannels;
+        stbi_uc* pixels = stbi_load(path.c_str(), &texW, &texH, &texChannels, STBI_rgb_alpha);
+        if (!pixels) {
+            throw std::runtime_error("failed to load texture: " + path);
+        }
+        VkDeviceSize imageSize = texW * texH * 4;
+
+        texW_ = (uint32_t)texW;
+        texH_ = (uint32_t)texH;
+
+        VkBuffer staging; VkDeviceMemory stagingMem;
+        createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                    staging, stagingMem);
+
+        void* data;
+        vkMapMemory(ctx_.device, stagingMem, 0, imageSize, 0, &data);
+        memcpy(data, pixels, (size_t)imageSize);
+        vkUnmapMemory(ctx_.device, stagingMem);
+        stbi_image_free(pixels);
+
+        createImage(texW_, texH_, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+                    VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                    defaultTextureImage_, defaultTextureMemory_);
+
+        transitionImageLayout(defaultTextureImage_, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        copyBufferToImage(staging, defaultTextureImage_, texW_, texH_);
+        transitionImageLayout(defaultTextureImage_, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+        vkDestroyBuffer(ctx_.device, staging, nullptr);
+        vkFreeMemory(ctx_.device, stagingMem, nullptr);
+
+        VkImageViewCreateInfo viewInfo{};
+        viewInfo.sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image    = defaultTextureImage_;
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewInfo.format   = VK_FORMAT_R8G8B8A8_UNORM;
+        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        viewInfo.subresourceRange.levelCount = 1;
+        viewInfo.subresourceRange.layerCount = 1;
+        vkCreateImageView(ctx_.device, &viewInfo, nullptr, &defaultTextureView_);
+
+        VkSamplerCreateInfo sampInfo{};
+        sampInfo.sType     = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        sampInfo.magFilter = VK_FILTER_NEAREST;
+        sampInfo.minFilter = VK_FILTER_NEAREST;
+        sampInfo.addressModeU = sampInfo.addressModeV = sampInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        vkCreateSampler(ctx_.device, &sampInfo, nullptr, &defaultSampler_);
+
+        atlas_.init(texW_, texH_);
+        atlas_.registerRegion("morning_star", 0, 0, (float)texW_, (float)texH_);
+    }
+
+    void createDescriptorSetLayout() {
+        VkDescriptorSetLayoutBinding binding{};
+        binding.binding         = 0;
+        binding.descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        binding.descriptorCount = 1;
+        binding.stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        VkDescriptorSetLayoutCreateInfo info{};
+        info.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        info.bindingCount = 1;
+        info.pBindings    = &binding;
+        vkCreateDescriptorSetLayout(ctx_.device, &info, nullptr, &descriptorSetLayout);
+    }
+
+    void createDescriptorPool() {
+        VkDescriptorPoolSize poolSize{};
+        poolSize.type            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        poolSize.descriptorCount = 1;
+
+        VkDescriptorPoolCreateInfo info{};
+        info.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        info.poolSizeCount = 1;
+        info.pPoolSizes    = &poolSize;
+        info.maxSets       = 1;
+        vkCreateDescriptorPool(ctx_.device, &info, nullptr, &descriptorPool);
+    }
+
+    void createDescriptorSet() {
+        VkDescriptorSetAllocateInfo allocInfo{};
+        allocInfo.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool     = descriptorPool;
+        allocInfo.descriptorSetCount = 1;
+        allocInfo.pSetLayouts        = &descriptorSetLayout;
+        vkAllocateDescriptorSets(ctx_.device, &allocInfo, &descriptorSet);
+
+        VkDescriptorImageInfo imageInfo{};
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageInfo.imageView   = defaultTextureView_;
+        imageInfo.sampler     = defaultSampler_;
+
+        VkWriteDescriptorSet write{};
+        write.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstSet          = descriptorSet;
+        write.dstBinding      = 0;
+        write.descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        write.descriptorCount = 1;
+        write.pImageInfo      = &imageInfo;
+        vkUpdateDescriptorSets(ctx_.device, 1, &write, 0, nullptr);
+    }
+
     VkShaderModule createShaderModule(const std::vector<char>& code) {
         VkShaderModuleCreateInfo info{};
         info.sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -159,18 +359,25 @@ private:
         binding.stride    = sizeof(UIVertex);
         binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-        VkVertexInputAttributeDescription attr{};
-        attr.binding  = 0;
-        attr.location = 0;
-        attr.format   = VK_FORMAT_R32G32_SFLOAT;
-        attr.offset   = 0;
+        VkVertexInputAttributeDescription attrs[3]{};
+        attrs[0].binding = 0; attrs[0].location = 0;
+        attrs[0].format  = VK_FORMAT_R32G32_SFLOAT;
+        attrs[0].offset  = offsetof(UIVertex, pos);
+
+        attrs[1].binding = 0; attrs[1].location = 1;
+        attrs[1].format  = VK_FORMAT_R32G32_SFLOAT;
+        attrs[1].offset  = offsetof(UIVertex, uv);
+
+        attrs[2].binding = 0; attrs[2].location = 2;
+        attrs[2].format  = VK_FORMAT_R32G32B32A32_SFLOAT;
+        attrs[2].offset  = offsetof(UIVertex, color);
 
         VkPipelineVertexInputStateCreateInfo vertInput{};
-        vertInput.sType                           = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+        vertInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
         vertInput.vertexBindingDescriptionCount   = 1;
         vertInput.pVertexBindingDescriptions      = &binding;
-        vertInput.vertexAttributeDescriptionCount = 1;
-        vertInput.pVertexAttributeDescriptions    = &attr;
+        vertInput.vertexAttributeDescriptionCount = 3;
+        vertInput.pVertexAttributeDescriptions    = attrs;
 
         VkPipelineInputAssemblyStateCreateInfo assembly{};
         assembly.sType    = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -223,8 +430,8 @@ private:
 
         VkPipelineLayoutCreateInfo layoutInfo{};
         layoutInfo.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        layoutInfo.setLayoutCount         = 0;
-        layoutInfo.pSetLayouts            = nullptr;
+        layoutInfo.setLayoutCount         = 1;
+        layoutInfo.pSetLayouts            = &descriptorSetLayout;
         layoutInfo.pushConstantRangeCount = 0;
         layoutInfo.pPushConstantRanges    = nullptr;
         if (vkCreatePipelineLayout(ctx_.device, &layoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS)

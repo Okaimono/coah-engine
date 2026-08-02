@@ -5,6 +5,7 @@
 #include "game/player/player.hpp"
 #include "game/block_interaction.hpp"
 #include "game/chunk_mesher.hpp"
+#include "game/game_ui.hpp"
 
 class CallOfAHero {
 public:
@@ -20,6 +21,11 @@ public:
 
     void update(float dt) {
         player.processInput(inputManager_, dt);
+        uiContext_.BeginFrame(
+            static_cast<float>(inputManager_.mouseX()),
+            static_cast<float>(inputManager_.mouseY()),
+            inputManager_.mouseButtonHeld(GLFW_MOUSE_BUTTON_LEFT)
+        );
         blockInteraction_.update();
 
         Rect rect;
@@ -28,7 +34,10 @@ public:
         rect.w = 300.0f;
         rect.h = 600.0f;
 
-        uiContext_.Button("test", rect);
+        glm::vec4 color = {0.0f, 0.0f, 0.0f, 1.0f};
+
+        bool clicked = uiContext_.Button("test", rect, color);
+        hotbarUI_.draw(uiContext_);
     }
 
     void render() {
@@ -37,6 +46,7 @@ public:
         }
 
         uiContext_.endFrame();
+        renderer_.updateUI(uiContext_.getQuadBatch());
 
         glm::mat4 view = player.getViewMatrix();
         glm::mat4 proj = player.getProjectionMatrix();
@@ -53,6 +63,8 @@ private:
     Player player;
     ChunkMesher chunkMesher_;
     BlockInteraction blockInteraction_;
+
+    HotbarUI hotbarUI_;
 
     void createChunkSlots() {
         for (auto& [key, value] : world.worldGrid) {

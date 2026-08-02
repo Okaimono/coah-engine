@@ -22,14 +22,14 @@ public:
         : ctx_(ctx)
         , swapchain_(swapchain)
         , renderPass_(ctx.device, swapchain.swapchainFormat)
+        , commandManager_(ctx)   
         , allocator_(ctx, commandManager_)
         , descriptorSetLayout_(ctx)
         , chunkPipeline_(ctx, swapchain, renderPass_, descriptorSetLayout_.handle)
-        , uiPipeline_(ctx, swapchain, renderPass_)
+        , uiPipeline_(ctx, swapchain, renderPass_, commandManager_)
     {
         createDepthResources();
         createFramebuffers();
-        commandManager_.init(&ctx);
         createTextureImage();
         createTextureImageView();
         createSampler();
@@ -108,7 +108,6 @@ public:
         vkDestroySemaphore(ctx_.device, imageAvailable_, nullptr);
         vkDestroySemaphore(ctx_.device, renderFinished_, nullptr);
         vkDestroyFence(ctx_.device, inFlight_, nullptr);
-        commandManager_.cleanup();
         for (auto fb : framebuffers_) vkDestroyFramebuffer(ctx_.device, fb, nullptr);
     }
 
@@ -277,6 +276,8 @@ private:
 
     void drawUI(VkCommandBuffer& cmd) {
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, uiPipeline_.pipeline);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+            uiPipeline_.pipelineLayout, 0, 1, &uiPipeline_.descriptorSet, 0, nullptr);  // <-- is this line present?
         VkBuffer bufs[] = {uiPipeline_.vertexBuffer};
         VkDeviceSize offsets[] = {0};
         vkCmdBindVertexBuffers(cmd, 0, 1, bufs, offsets);

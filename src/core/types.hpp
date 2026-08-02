@@ -8,11 +8,21 @@ struct Vertex {
 
 struct UIVertex {
     glm::vec2 pos;
+    glm::vec2 uv;
+    glm::vec4 color;
 };
 
 struct UniformBufferObject {
     glm::mat4 view;
     glm::mat4 proj;
+};
+
+struct Rect {
+    float x, y, w, h;
+};
+
+struct UVRect {
+    float u0 = 0.0f, v0 = 0.0f, u1 = 1.0f, v1 = 1.0f;
 };
 
 const std::vector<Vertex> vertices = {

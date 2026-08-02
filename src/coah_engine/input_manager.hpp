@@ -39,6 +39,9 @@ public:
         rightWasDown_ = rightDown;
     }
 
+    double mouseX() const { return lastX_; }
+    double mouseY() const { return lastY_; }
+
     double mouseDeltaX() const { return mouseDeltaX_; }
     double mouseDeltaY() const { return mouseDeltaY_; }
 

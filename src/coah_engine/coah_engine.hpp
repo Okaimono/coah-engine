@@ -31,7 +31,7 @@ public:
     void run() {
         float lastTime = static_cast<float>(glfwGetTime());
         while (!glfwWindowShouldClose(window_.get())) {
-            float currentTime = glfwGetTime();
+            float currentTime = static_cast<float>(glfwGetTime());
             float dt = currentTime - lastTime;
             lastTime = currentTime;
 
@@ -41,7 +41,6 @@ public:
 
             // Update all renderer data all at once rather than updateUI()
             coah_.render();
-            renderer_.updateUI(uiContext_.getQuadBatch());
         }
         vkDeviceWaitIdle(ctx_.device);
     }
