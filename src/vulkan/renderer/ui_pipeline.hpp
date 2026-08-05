@@ -4,7 +4,6 @@
 #include "vulkan/swapchain.hpp"
 #include "vulkan/renderer/render_pass.hpp"
 #include "vulkan/command_manager.hpp"
-#include "vulkan/renderer/texture_atlas.hpp"
 #include "core/types.hpp"
 
 #include <vector>
@@ -17,8 +16,6 @@
 
 class UiPipeline {
 public:
-    TextureAtlas atlas_;
-
     VkPipeline            pipeline            = VK_NULL_HANDLE;
     VkPipelineLayout      pipelineLayout      = VK_NULL_HANDLE;
     VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
@@ -30,6 +27,8 @@ public:
     VkBuffer       vertexBuffer = VK_NULL_HANDLE;
     VkDeviceMemory vertexMemory = VK_NULL_HANDLE;
 
+    uint32_t texW_ = 0, texH_ = 0;   // exposed publicly — game side can use these for manual UV math if needed
+
     UiPipeline(VulkanContext& ctx, Swapchain& swapchain, RenderPass& renderPass, CommandManager& commandManager)
         : ctx_(ctx)
         , swapchain_(swapchain)
@@ -37,7 +36,7 @@ public:
         , commandManager_(commandManager)
     {
         createVertexBuffer();
-        createAtlasTexture("assets/textures/items/morning_star.png");
+        createAtlasTexture("assets/textures/items/ui_atlas.png");
         createDescriptorSetLayout();
         createDescriptorPool();
         createDescriptorSet();
@@ -101,8 +100,6 @@ private:
     VkDeviceMemory defaultTextureMemory_ = VK_NULL_HANDLE;
     VkImageView    defaultTextureView_   = VK_NULL_HANDLE;
     VkSampler      defaultSampler_       = VK_NULL_HANDLE;
-
-    uint32_t texW_ = 0, texH_ = 0;
 
     void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
                        VkMemoryPropertyFlags properties,
@@ -272,8 +269,9 @@ private:
         sampInfo.addressModeU = sampInfo.addressModeV = sampInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
         vkCreateSampler(ctx_.device, &sampInfo, nullptr, &defaultSampler_);
 
-        atlas_.init(texW_, texH_);
-        atlas_.registerRegion("morning_star", 0, 0, (float)texW_, (float)texH_);
+        // No atlas_.init()/registerRegion() here anymore — UIContext owns the
+        // name -> UVRect lookup table directly now, populated by hand with real
+        // coordinates matching whatever's actually in this PNG.
     }
 
     void createDescriptorSetLayout() {

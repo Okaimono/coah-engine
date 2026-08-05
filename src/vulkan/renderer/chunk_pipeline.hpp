@@ -3,6 +3,7 @@
 #include "vulkan/vulkan_context.hpp"
 #include "vulkan/swapchain.hpp"
 #include "vulkan/renderer/render_pass.hpp"
+#include "core/config.hpp"
 
 #include <vector>
 #include <string>
@@ -94,12 +95,15 @@ private:
         assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 
         VkViewport viewport{};
-        viewport.width    = (float)swapchain_.swapchainExtent.width;
-        viewport.height   = (float)swapchain_.swapchainExtent.height;
+        viewport.x        = 0.0f;
+        viewport.y        = 0.0f;
+        viewport.width    = (float)Config::GAME_WIDTH;
+        viewport.height   = (float)Config::GAME_HEIGHT;
         viewport.maxDepth = 1.0f;
 
         VkRect2D scissor{};
-        scissor.extent = swapchain_.swapchainExtent;
+        scissor.offset = {0, 0};
+        scissor.extent = { (uint32_t)Config::GAME_WIDTH, (uint32_t)Config::GAME_HEIGHT };
 
         VkPipelineViewportStateCreateInfo viewportState{};
         viewportState.sType         = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;

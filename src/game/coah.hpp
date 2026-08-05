@@ -3,6 +3,8 @@
 #include "coah_engine/input_manager.hpp"
 #include "coah_engine/ui_context.hpp"
 #include "game/player/player.hpp"
+#include "game/player/player_inventory.hpp"
+
 #include "game/block_interaction.hpp"
 #include "game/chunk_mesher.hpp"
 #include "game/game_ui.hpp"
@@ -20,24 +22,22 @@ public:
     }
 
     void update(float dt) {
-        player.processInput(inputManager_, dt);
         uiContext_.BeginFrame(
             static_cast<float>(inputManager_.mouseX()),
             static_cast<float>(inputManager_.mouseY()),
             inputManager_.mouseButtonHeld(GLFW_MOUSE_BUTTON_LEFT)
         );
-        blockInteraction_.update();
 
-        Rect rect;
-        rect.x = 700.0f;
-        rect.y = 0.0f;
-        rect.w = 300.0f;
-        rect.h = 600.0f;
+        // PROCESS INPUTS HERE
+        if (inputManager_.escapePressedOnce()) {
+            menuOpen_ = !menuOpen_;
+            inputManager_.setCursorMode(!menuOpen_);
+        }
+        player.processInput(inputManager_, dt, menuOpen_);
+        blockInteraction_.processInput(menuOpen_);
 
-        glm::vec4 color = {0.0f, 0.0f, 0.0f, 1.0f};
-
-        bool clicked = uiContext_.Button("test", rect, color);
-        hotbarUI_.draw(uiContext_);
+        interfaceUI_.draw(uiContext_);
+        hotbarUI_.draw(uiContext_, playerInventory_);
     }
 
     void render() {
@@ -61,10 +61,15 @@ private:
 
     World world;
     Player player;
+    PlayerInventory playerInventory_;
+
     ChunkMesher chunkMesher_;
     BlockInteraction blockInteraction_;
 
     HotbarUI hotbarUI_;
+    InterfaceUI interfaceUI_;
+
+    bool menuOpen_ = false;
 
     void createChunkSlots() {
         for (auto& [key, value] : world.worldGrid) {

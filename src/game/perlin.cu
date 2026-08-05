@@ -81,7 +81,6 @@ extern "C" void launchNoiseMap(int x, int z, PerlinChunk* chunks) {
 
     float kernelMs = 0;
     cudaEventElapsedTime(&kernelMs, start, stop);
-    printf("kernel: %.3f ms\n", kernelMs);
 
     cudaMemcpy(chunks, deviceData, bytes, cudaMemcpyDeviceToHost);
     cudaFree(deviceData);

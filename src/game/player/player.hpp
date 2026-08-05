@@ -1,6 +1,8 @@
 #pragma once
 #include "vulkan_includes.hpp"
 #include "coah_engine/input_manager.hpp"
+#include "core/config.hpp"
+
 #include <glm/gtc/matrix_transform.hpp>
 
 class Player {
@@ -14,11 +16,13 @@ public:
     float yaw         = -135.0f;
     float pitch       = -20.0f;
     float fov         = 60.0f;
-    float lastX       = WIDTH / 2.0f;
-    float lastY       = HEIGHT / 2.0f;
+    float lastX       = Config::GAME_WIDTH / 2.0f;
+    float lastY       = Config::GAME_HEIGHT / 2.0f;
     bool firstMouse   = true;
 
-    void processInput(InputManager& input, float dt) {
+    void processInput(InputManager& input, float dt, bool menuOpen) {
+        if (menuOpen) {return;}
+
         onMouseMove(input.mouseDeltaX(), input.mouseDeltaY());
         if (input.keyPressed(GLFW_KEY_W))          position += speed * dt * orientation;
         if (input.keyPressed(GLFW_KEY_S))          position -= speed * dt * orientation;
@@ -47,7 +51,8 @@ public:
     }
 
     glm::mat4 getProjectionMatrix() {
-        glm::mat4 proj = glm::perspective(glm::radians(fov), 1600.0f / 900.0f, 0.1f, 1000.0f);
+        float aspect = (float)Config::GAME_WIDTH / (float)Config::GAME_HEIGHT;
+        glm::mat4 proj = glm::perspective(glm::radians(fov), aspect, 0.1f, 1000.0f);
         proj[1][1] *= -1;
         return proj;
     }

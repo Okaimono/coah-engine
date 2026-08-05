@@ -10,7 +10,7 @@ struct QuadBatch {
 
     void addRect(const Rect& rect, const glm::vec4& color, const UVRect& uv) {
         auto toNDC = [&](float x, float y) -> glm::vec2 {
-            return { (x / WIDTH) * 2.0f - 1.0f, (y / HEIGHT) * 2.0f - 1.0f };
+            return { (x / Config::SCREEN_WIDTH) * 2.0f - 1.0f, (y / Config::SCREEN_HEIGHT) * 2.0f - 1.0f };
         };
 
         glm::vec2 p0 = toNDC(rect.x, rect.y);
@@ -41,6 +41,15 @@ struct ClickResult {
     float localY = 0.0f;
 };
 
+std::unordered_map<std::string, UVRect> regions_ = {
+    {"empty",        UVRect{0.99f, 0.0f, 1.0f, 0.0f}},
+    {"white",        UVRect{0.0f, 0.0f, 0.0078f, 0.0078f}},
+    {"morning_star", UVRect{0.0f, 0.96875f, 0.03125f, 1.0f}},
+    {"hotbar",        UVRect{0.93164f, 0.96484f, 1.0f,     1.0f}},
+};
+
+// UI context needs to be able to get the UV coords
+
 class UIContext {
 public:
     void BeginFrame(float mouseX, float mouseY, bool mouseDown) {
@@ -59,23 +68,34 @@ public:
         pendingButtons_.clear();
     }
 
+    UVRect getUVCoords(const char* label) {
+        auto it = regions_.find(label);
+            if (it == regions_.end()) {
+            return UVRect{};
+        }
+        return it->second;
+    }
+
+    void drawRect(const char* label, const Rect& bounds, 
+                  const glm::vec4& color = {1.0f, 1.0f, 1.0f, 1.0f}) {
+        UVRect uv = getUVCoords(label);
+        pendingButtons_.push_back({bounds, color, uv});
+    }
+
     // Solid-color button — uv defaults to whole-texture, irrelevant against the 1x1 white default
     bool Button(const char* label, const Rect& bounds,
                 const glm::vec4& color = {1.0f, 1.0f, 1.0f, 1.0f}) {
-        pendingButtons_.push_back({bounds, color, UVRect{}});
+        UVRect uv = getUVCoords(label);
+
+        pendingButtons_.push_back({bounds, color, uv});
         bool hovered = hitTest(bounds);
         return hovered && justClicked();
     }
 
-    bool ImageButton(const char* label, const Rect& bounds, const UVRect& uv,
-               const glm::vec4& tint = {1.0f, 1.0f, 1.0f, 1.0f}) {
-        pendingButtons_.push_back({bounds, tint, uv});
-        bool hovered = hitTest(bounds);
-        return hovered && justClicked();
-    }
-
-    ClickResult ImageArea(const char* label, const Rect& bounds, const UVRect& uv,
+    ClickResult ImageArea(const char* label, const Rect& bounds,
                           const glm::vec4& tint = {1.0f, 1.0f, 1.0f, 1.0f}) {
+        UVRect uv = getUVCoords(label);
+
         pendingButtons_.push_back({bounds, tint, uv});
         bool hovered = hitTest(bounds);
 
@@ -87,6 +107,16 @@ public:
         }
         return result;
     }
+
+    const std::vector<UIVertex>& getQuadBatch() const { return quadBatch_.vertices; }
+
+private:
+    bool mouseCaptured_ = false;
+    float mouseX_, mouseY_;
+    bool mouseDown_, mouseDownLastFrame_;
+
+    std::vector<Entry> pendingButtons_;
+    QuadBatch quadBatch_;
 
     bool hitTest(const Rect& bounds) {
         bool hovered = !mouseCaptured_ &&
@@ -103,13 +133,4 @@ public:
         return mouseDown_ && !mouseDownLastFrame_;
     }
 
-    const std::vector<UIVertex>& getQuadBatch() const { return quadBatch_.vertices; }
-
-private:
-    bool mouseCaptured_ = false;
-    float mouseX_, mouseY_;
-    bool mouseDown_, mouseDownLastFrame_;
-
-    std::vector<Entry> pendingButtons_;
-    QuadBatch quadBatch_;
 };

@@ -14,7 +14,9 @@ public:
         , player_(player)
     {}
 
-    void update() {
+    void processInput(bool menuOpen) {
+        if (menuOpen) {return; }
+
         if (inputManager_.leftClickedOnce()) {
             breakBlock();
         }

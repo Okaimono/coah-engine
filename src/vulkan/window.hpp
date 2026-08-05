@@ -14,6 +14,7 @@ public:
         if (!handle_) { glfwTerminate(); throw std::runtime_error("window creation failed"); }
         glfwSetInputMode(handle_, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     }
+
     ~Window() { 
         glfwDestroyWindow(handle_);
         glfwTerminate();
@@ -26,6 +27,7 @@ public:
         assert(handle_ && "Window variant violated");
         return handle_; 
     }
+    
 private:
     GLFWwindow* handle_ = nullptr;
 };

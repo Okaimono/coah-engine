@@ -20,7 +20,7 @@
 class CoahEngine {
 public:
     CoahEngine() 
-        : window_(WIDTH, HEIGHT, "coah")
+        : window_(Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, "coah")
         , ctx_(window_)
         , swapchain_(ctx_)
         , renderer_(ctx_, swapchain_)
