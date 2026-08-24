@@ -11,7 +11,7 @@ class PlayerInventory {
 public:
     PlayerInventory() {
         for (int i = 0; i < 4; i++) {
-            hotbar_[i].item = "none";
+            hotbar_[i].item = "empty";
         }
         hotbar_[0].item = "morning_star";
     }

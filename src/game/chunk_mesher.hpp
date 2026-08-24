@@ -9,6 +9,17 @@ public:
         , world_(world)
     {}
 
+    void addRenderEntries() {
+        for (const auto& [key, value] : world_.worldGrid) {
+            ChunkRenderEntry entry;
+            entry.slot = value.slot;
+            entry.faceSize = static_cast<uint32_t>(value.faces.size() * 6);
+            entry.chunkModel = glm::translate(glm::mat4(1.0f), glm::vec3((float)key.x * 16.0f, 0.0f, (float)key.z * 16.0f));
+
+            renderer_.addRenderEntry(entry);
+        }
+    }
+
     bool hasPendingWork() const {
         return !dirtyChunks_.empty();
     }

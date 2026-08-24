@@ -45,13 +45,14 @@ public:
             chunkMesher_.flush();
         }
 
+        chunkMesher_.addRenderEntries();
+        
         uiContext_.endFrame();
         renderer_.updateUI(uiContext_.getQuadBatch());
 
         glm::mat4 view = player.getViewMatrix();
         glm::mat4 proj = player.getProjectionMatrix();
         renderer_.updateUniformBuffer(view, proj);
-        renderer_.drawFrame(world);
     }
     
 private:

@@ -67,6 +67,16 @@ public:
     UiPipeline(UiPipeline&&)                 = delete;
     UiPipeline& operator=(UiPipeline&&)      = delete;
 
+    void recordUI(VkCommandBuffer& cmd) {
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+            pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+        VkBuffer bufs[] = {vertexBuffer};
+        VkDeviceSize offsets[] = {0};
+        vkCmdBindVertexBuffers(cmd, 0, 1, bufs, offsets);
+        vkCmdDraw(cmd, vertexCount_, 1, 0, 0);
+    }
+
     void updateVertexBuffer(const std::vector<UIVertex>& vertices) {
         assert(vertices.size() <= kMaxUiVertices && "UI vertex buffer overflow");
 

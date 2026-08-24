@@ -45,7 +45,7 @@ std::unordered_map<std::string, UVRect> regions_ = {
     {"empty",        UVRect{0.99f, 0.0f, 1.0f, 0.0f}},
     {"white",        UVRect{0.0f, 0.0f, 0.0078f, 0.0078f}},
     {"morning_star", UVRect{0.0f, 0.96875f, 0.03125f, 1.0f}},
-    {"hotbar",        UVRect{0.93164f, 0.96484f, 1.0f,     1.0f}},
+    {"hotbar",       UVRect{0.86523f, 0.96484f, 1.0f, 1.0f}},
 };
 
 // UI context needs to be able to get the UV coords

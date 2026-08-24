@@ -48,30 +48,24 @@ public:
         float slotStride = iconSize_ + border_;   // must match drawHotbar's stride exactly
 
         for (int i = 0; i < slotCount_; i++) {
+            std::string item = inventory.getHotbarItem(i);
+            if (item == "empty") continue;   // nothing to draw — hotbar background shows through
+
             float x = hotbarX_ + scale_ * (border_ + i * slotStride);
             float y = hotbarY_ + scale_ * border_;
 
-            Rect square;
-            square.x = x;
-            square.y = y;
-            square.w = iconSize_ * scale_;
-            square.h = iconSize_ * scale_;
-
-            std::string item = inventory.getHotbarItem(i);
+            Rect square{x, y, iconSize_ * scale_, iconSize_ * scale_};
             ui.drawRect(item.c_str(), square);
         }
     }
 
 private:
+    float hotbarX_ = Config::SCREEN_WIDTH - 250.0f;
+    float hotbarY_ = 400.0f;
+
     float iconSize_ = 16.0f;
     float border_   = 1.0f;
 
     const int slotCount_ = 4;
     const float scale_ = 3.0f;
-
-    float hotbarWidth = (17.0f * slotCount_ + 1.0f) * scale_;
-
-    float hotbarX_ = Config::SCREEN_WIDTH - (Config::UI_PANEL_WIDTH / 2.0f) - (hotbarWidth / 2.0f);
-    float hotbarY_ = 400.0f;
-
 };

@@ -41,6 +41,7 @@ public:
 
             // Update all renderer data all at once rather than updateUI()
             coah_.render();
+            renderer_.drawFrame();
         }
         vkDeviceWaitIdle(ctx_.device);
     }
