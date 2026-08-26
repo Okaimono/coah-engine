@@ -35,6 +35,10 @@ public:
         createSyncObjects();
     }
 
+    void updateEntityInstances(const std::vector<EntityInstance>& instances) {
+        entityPipeline_.updateInstances(instances);
+    }
+
     Slot reserveChunkSlot(const std::vector<uint32_t>& faceData) {
         Slot slot = allocator_.reserveSlot();
         allocator_.updateSlot(slot, faceData);

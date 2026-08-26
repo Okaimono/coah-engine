@@ -45,8 +45,12 @@ public:
         ));
     }
 
+    glm::vec3 getEyePosition() const {
+        return position + glm::vec3(0.0f, 1.7f, 0.0f);
+    }
+
     glm::mat4 getViewMatrix() {
-        glm::vec3 eyePos = position + glm::vec3(0.0f, 1.7f, 0.0f);
+        glm::vec3 eyePos = getEyePosition();
         return glm::lookAt(eyePos, eyePos + orientation, up);
     }
 

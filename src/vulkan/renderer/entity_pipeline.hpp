@@ -1,4 +1,6 @@
 #pragma once
+#include <glm/gtc/quaternion.hpp>
+
 #include "stb_image.h"
 #include "vulkan_includes.hpp"
 #include "vulkan/vulkan_context.hpp"
@@ -15,6 +17,7 @@
 #include <stdexcept>
 #include <iostream>
 #include <cassert>
+#include <unordered_map>
 
 // Per-vertex data — 8 unique positions x however many verts per cube (36, unindexed).
 struct EntityVertex {
@@ -22,22 +25,30 @@ struct EntityVertex {
     glm::vec2 uv;
 };
 
+enum class Entity : uint32_t {
+    NONE = 0,
+    MORNING_STAR_ARROW,
+    YELLOW
+};
+
 // Per-instance data — one of these per entity drawn this frame.
 struct EntityInstance {
     glm::vec3 worldPos;
     float     size;
-    glm::vec4 tint;
+    glm::vec4 rotation;
 };
 
-enum class Entity {
-    NONE = 0,
-    MORNING_STAR_ARROW
+std::unordered_map<Entity, UVRect> entityAtlasRegions_ = {
+    {Entity::NONE, UVRect{0.0f, 0.0f, 0.0078f, 0.0078f}},
+    {Entity::YELLOW, UVRect{0.0625f, 0.96875f, 0.09375f, 1.0f}},
 };
 
-struct EntityRenderEntry {
-    Entity entity = Entity::NONE;
-    glm::mat4 entityModel;
+struct MeshRange {
+    uint32_t firstVertex;
+    uint32_t vertexCount;
 };
+
+std::unordered_map<Entity, MeshRange> meshTable_;
 
 class EntityPipeline {
 public:
@@ -73,11 +84,6 @@ public:
         createPipeline(descriptorSetLayout);
     }
 
-    enum class Entity : uint32_t {
-        NONE = 0,
-        MORNING_STAR_ARROW
-    };
-
     ~EntityPipeline() {
         if (instanceMappedPtr_) vkUnmapMemory(ctx_.device, instanceMemory);
 
@@ -103,6 +109,7 @@ public:
     // Called once per frame with the full list of entities to draw this frame.
     void updateInstances(const std::vector<EntityInstance>& instances) {
         assert(instances.size() <= kMaxInstances && "EntityPipeline instance overflow");
+
         VkDeviceSize size = instances.size() * sizeof(EntityInstance);
         memcpy(instanceMappedPtr_, instances.data(), size);
         instanceCount_ = (uint32_t)instances.size();
@@ -120,12 +127,14 @@ public:
         EntityInstance test{};
         test.worldPos = glm::vec3(0.0f, 50.0f, 0.0f);
         test.size     = 1.0f;
-        test.tint     = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+
+        glm::quat q = glm::angleAxis(glm::radians(20.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        test.rotation = glm::vec4(q.x, q.y, q.z, q.w);
 
         memcpy(instanceMappedPtr_, &test, sizeof(test));
         instanceCount_ = 1;
     }
-
+    
     // Records the draw for this frame's instances. Call after updateInstances().
     void recordEntities(VkCommandBuffer cmd) {
         if (instanceCount_ == 0) return;
@@ -170,8 +179,6 @@ private:
     VkSampler      textureSampler_ = VK_NULL_HANDLE;
 
     static constexpr uint32_t kMaxInstances = 4096;
-
-    std::vector<EntityRenderEntry> renderEntries;
 
     void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
                        VkMemoryPropertyFlags properties,
@@ -270,7 +277,7 @@ private:
 
     void createTextureImage() {
         int w, h, channels;
-        stbi_uc* pixels = stbi_load("assets/textures/items/morning_star.png", &w, &h, &channels, STBI_rgb_alpha);
+        stbi_uc* pixels = stbi_load("assets/textures/items/entity_atlas.png", &w, &h, &channels, STBI_rgb_alpha);
         if (!pixels) throw std::runtime_error("failed to load entity texture");
 
         VkDeviceSize imageSize = w * h * 4;
@@ -361,6 +368,19 @@ private:
 
     // 36 unindexed verts (6 faces x 2 tris x 3 verts). Every face samples the
     // full [0,0]-[1,1] range of the same texture, since all six sides match.
+
+    // void createEntityMeshBuffer() {
+    //     std::vector<EntityVertex> allVerts;
+
+    //     auto appendMesh = [&](const Entity entity, const std::vector<EntityVertex>& verts) {
+    //         MeshRange range;
+    //         range.firstVertex = (uint32_t)allVerts.size();
+    //         range.vertexCount  = (uint32_t)verts.size();
+    //         meshTable_[entity] = range;
+    //         allVerts.insert(allVerts.end(), verts.begin(), verts.end())
+    //     };
+    // }
+
     void createCubeVertexBuffer() {
         glm::vec3 p[8] = {
             {-0.5f,-0.5f,-0.5f}, { 0.5f,-0.5f,-0.5f}, { 0.5f, 0.5f,-0.5f}, {-0.5f, 0.5f,-0.5f}, // back  (z-)
@@ -377,7 +397,13 @@ private:
             {0,1,2,3}, // -Z
         };
 
-        constexpr glm::vec2 uv00{0.0f, 0.0f}, uv10{0.01f, 0.0f}, uv11{0.01f, 0.01f}, uv01{0.0f, 0.01f};
+        auto it = entityAtlasRegions_.find(Entity::YELLOW);
+        UVRect uvCoords = it->second;
+        
+        glm::vec2 uv00{uvCoords.u0, uvCoords.v0}, 
+                uv10{uvCoords.u1, uvCoords.v0}, 
+                uv11{uvCoords.u1, uvCoords.v1}, 
+                uv01{uvCoords.u0, uvCoords.v1};
 
         std::vector<EntityVertex> verts;
         verts.reserve(36);
@@ -398,14 +424,6 @@ private:
         vkMapMemory(ctx_.device, cubeVertexMemory, 0, size, 0, &data);
         memcpy(data, verts.data(), size);
         vkUnmapMemory(ctx_.device, cubeVertexMemory);
-    }
-
-    void createEntityVertexBuffer() {
-        glm::vec3 p[8] = {
-            {-0.5f,-0.5f,-0.5f}, { 0.5f,-0.5f,-0.5f}, { 0.5f, 0.5f,-0.5f}, {-0.5f, 0.5f,-0.5f}, // back  (z-)
-            {-0.5f,-0.5f, 0.5f}, { 0.5f,-0.5f, 0.5f}, { 0.5f, 0.5f, 0.5f}, {-0.5f, 0.5f, 0.5f}, // front (z+)
-        };
-
     }
 
     void createInstanceBuffer() {
@@ -471,7 +489,7 @@ private:
 
         attrs[4].binding = 1; attrs[4].location = 4;          // instance tint
         attrs[4].format  = VK_FORMAT_R32G32B32A32_SFLOAT;
-        attrs[4].offset  = offsetof(EntityInstance, tint);
+        attrs[4].offset  = offsetof(EntityInstance, rotation);
 
         VkPipelineVertexInputStateCreateInfo vertInput{};
         vertInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;

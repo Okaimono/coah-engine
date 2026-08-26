@@ -70,7 +70,7 @@ public:
 
     UVRect getUVCoords(const char* label) {
         auto it = regions_.find(label);
-            if (it == regions_.end()) {
+        if (it == regions_.end()) {
             return UVRect{};
         }
         return it->second;

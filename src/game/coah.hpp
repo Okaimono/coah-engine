@@ -4,6 +4,8 @@
 #include "coah_engine/ui_context.hpp"
 #include "game/player/player.hpp"
 #include "game/player/player_inventory.hpp"
+#include "game/player/player_interaction.hpp"
+#include "game/entities/arrow_manager.hpp"
 
 #include "game/block_interaction.hpp"
 #include "game/chunk_mesher.hpp"
@@ -17,6 +19,8 @@ public:
         , uiContext_(uiContext)
         , chunkMesher_(renderer_, world)
         , blockInteraction_(world, chunkMesher_, inputManager_, player)
+        , arrowManager_(renderer)
+        , playerInteraction_(inputManager, player, playerInventory_, arrowManager_)
     {
         createChunkSlots();
     }
@@ -35,6 +39,10 @@ public:
         }
         player.processInput(inputManager_, dt, menuOpen_);
         blockInteraction_.processInput(menuOpen_);
+        playerInteraction_.processInput(dt);
+
+        arrowManager_.updateArrows(dt);
+        
 
         interfaceUI_.draw(uiContext_);
         hotbarUI_.draw(uiContext_, playerInventory_);
@@ -49,6 +57,7 @@ public:
         
         uiContext_.endFrame();
         renderer_.updateUI(uiContext_.getQuadBatch());
+        arrowManager_.renderArrows();
 
         glm::mat4 view = player.getViewMatrix();
         glm::mat4 proj = player.getProjectionMatrix();
@@ -63,6 +72,9 @@ private:
     World world;
     Player player;
     PlayerInventory playerInventory_;
+    PlayerInteraction playerInteraction_;
+
+    ArrowManager arrowManager_;
 
     ChunkMesher chunkMesher_;
     BlockInteraction blockInteraction_;
