@@ -19,46 +19,56 @@ public:
         , uiContext_(uiContext)
         , chunkMesher_(renderer_, world)
         , blockInteraction_(world, chunkMesher_, inputManager_, player)
-        , arrowManager_(renderer)
+        , particleManager_(renderer)
+        , arrowManager_(renderer, particleManager_)
         , playerInteraction_(inputManager, player, playerInventory_, arrowManager_)
     {
         createChunkSlots();
     }
 
     void update(float dt) {
+        // make UIManager here
         uiContext_.BeginFrame(
             static_cast<float>(inputManager_.mouseX()),
             static_cast<float>(inputManager_.mouseY()),
             inputManager_.mouseButtonHeld(GLFW_MOUSE_BUTTON_LEFT)
         );
 
-        // PROCESS INPUTS HERE
+        // Process inputs (make PlayerInteraction head here)
         if (inputManager_.escapePressedOnce()) {
             menuOpen_ = !menuOpen_;
-            inputManager_.setCursorMode(!menuOpen_);
-        }
+            inputManager_.setCursorMode(!menuOpen_);}
         player.processInput(inputManager_, dt, menuOpen_);
         blockInteraction_.processInput(menuOpen_);
         playerInteraction_.processInput(dt);
 
+        // Update entities (make EntityManager)
         arrowManager_.updateArrows(dt);
+        particleManager_.updateParticles(dt);
         
-
+        // Update UI (make UIManager here)
         interfaceUI_.draw(uiContext_);
         hotbarUI_.draw(uiContext_, playerInventory_);
     }
 
     void render() {
+        // update Chunks (make ChunkManager)
         if (chunkMesher_.hasPendingWork()) {
             chunkMesher_.flush();
         }
-
         chunkMesher_.addRenderEntries();
         
+        // update UI stuff
         uiContext_.endFrame();
         renderer_.updateUI(uiContext_.getQuadBatch());
+
+        // render entities
         arrowManager_.renderArrows();
 
+        // render particles
+        particleManager_.renderParticles();
+
+        // update matricies
         glm::mat4 view = player.getViewMatrix();
         glm::mat4 proj = player.getProjectionMatrix();
         renderer_.updateUniformBuffer(view, proj);
@@ -74,6 +84,7 @@ private:
     PlayerInventory playerInventory_;
     PlayerInteraction playerInteraction_;
 
+    ParticleManager particleManager_;
     ArrowManager arrowManager_;
 
     ChunkMesher chunkMesher_;

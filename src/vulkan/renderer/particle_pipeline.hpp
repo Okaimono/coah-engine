@@ -16,8 +16,8 @@
 #include <iostream>
 #include <cassert>
 
-// Per-instance data — one of these per entity drawn this frame.
-struct EntityInstance {
+// Per-instance data — one of these per particle drawn this frame.
+struct ParticleInstance {
     glm::vec3 worldPos;
     float     size;
     glm::vec4 uv;
@@ -40,7 +40,7 @@ public:
     VkBuffer       quadVertexBuffer = VK_NULL_HANDLE;
     VkDeviceMemory quadVertexMemory = VK_NULL_HANDLE;
 
-    EntityPipeline(VulkanContext& ctx, Swapchain& swapchain, RenderPass& renderPass, CommandManager& commandManager)
+    ParticlePipeline(VulkanContext& ctx, Swapchain& swapchain, RenderPass& renderPass, CommandManager& commandManager)
         : ctx_(ctx)
         , swapchain_(swapchain)
         , renderPass_(renderPass)
@@ -58,7 +58,7 @@ public:
         createPipeline(descriptorSetLayout);
     }
 
-    ~EntityPipeline() {
+    ~ParticlePipeline() {
         if (instanceMappedPtr_) vkUnmapMemory(ctx_.device, instanceMemory);
 
         if (textureSampler_    != VK_NULL_HANDLE) vkDestroySampler(ctx_.device, textureSampler_, nullptr);
@@ -75,15 +75,15 @@ public:
         if (quadVertexMemory    != VK_NULL_HANDLE) vkFreeMemory(ctx_.device, quadVertexMemory, nullptr);
     }
 
-    EntityPipeline(const EntityPipeline&)            = delete;
-    EntityPipeline& operator=(const EntityPipeline&) = delete;
-    EntityPipeline(EntityPipeline&&)                 = delete;
-    EntityPipeline& operator=(EntityPipeline&&)      = delete;
+    ParticlePipeline(const ParticlePipeline&)            = delete;
+    ParticlePipeline& operator=(const ParticlePipeline&) = delete;
+    ParticlePipeline(ParticlePipeline&&)                 = delete;
+    ParticlePipeline& operator=(ParticlePipeline&&)      = delete;
 
     // Called once per frame with the full list of entities to draw this frame.
-    void updateInstances(const std::vector<EntityInstance>& instances) {
-        assert(instances.size() <= kMaxInstances && "EntityPipeline instance overflow");
-        VkDeviceSize size = instances.size() * sizeof(EntityInstance);
+    void updateInstances(const std::vector<ParticleInstance>& instances) {
+        assert(instances.size() <= kMaxInstances && "ParticlePipeline instance overflow");
+        VkDeviceSize size = instances.size() * sizeof(ParticleInstance);
         memcpy(instanceMappedPtr_, instances.data(), size);
         instanceCount_ = (uint32_t)instances.size();
     }
@@ -97,9 +97,9 @@ public:
     }
 
     void createTestInstance() {
-        EntityInstance test{};
+        ParticleInstance test{};
         test.worldPos = glm::vec3(0.0f, 100.0f, 0.0f);
-        test.size     = 1.0f;
+        test.size     = 4.0f;
         test.uv       = glm::vec4(0.0f, 0.0f, 1.0f, 1.0f);
         test.tint     = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 
@@ -108,7 +108,7 @@ public:
     }
 
     // Records the draw for this frame's instances. Call after updateInstances().
-    void recordEntities(VkCommandBuffer cmd) {
+    void recordParticles(VkCommandBuffer cmd) {
         if (instanceCount_ == 0) return;
 
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
@@ -249,8 +249,8 @@ private:
 
     void createTextureImage() {
         int w, h, channels;
-        stbi_uc* pixels = stbi_load("assets/textures/items/morning_star.png", &w, &h, &channels, STBI_rgb_alpha);
-        if (!pixels) throw std::runtime_error("failed to load entity texture");
+        stbi_uc* pixels = stbi_load("assets/textures/items/test_atlas.png", &w, &h, &channels, STBI_rgb_alpha);
+        if (!pixels) throw std::runtime_error("failed to load particle texture");
 
         VkDeviceSize imageSize = w * h * 4;
 
@@ -292,7 +292,7 @@ private:
         info.subresourceRange.levelCount = 1;
         info.subresourceRange.layerCount = 1;
         if (vkCreateImageView(ctx_.device, &info, nullptr, &textureView_) != VK_SUCCESS)
-            throw std::runtime_error("failed to create entity texture image view");
+            throw std::runtime_error("failed to create particle texture image view");
     }
 
     void createSampler() {
@@ -304,7 +304,7 @@ private:
         info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
         info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
         if (vkCreateSampler(ctx_.device, &info, nullptr, &textureSampler_) != VK_SUCCESS)
-            throw std::runtime_error("failed to create entity sampler");
+            throw std::runtime_error("failed to create particle sampler");
     }
 
     void createQuadVertexBuffer() {
@@ -323,7 +323,7 @@ private:
     }
 
     void createInstanceBuffer() {
-        VkDeviceSize size = kMaxInstances * sizeof(EntityInstance);
+        VkDeviceSize size = kMaxInstances * sizeof(ParticleInstance);
         createBuffer(size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                      instanceBuffer, instanceMemory);
@@ -342,8 +342,8 @@ private:
     }
 
     void createPipeline(VkDescriptorSetLayout setLayout) {
-        auto vert = readFile("assets/shaders/entity.vert.spv");
-        auto frag = readFile("assets/shaders/entity.frag.spv");
+        auto vert = readFile("assets/shaders/particle.vert.spv");
+        auto frag = readFile("assets/shaders/particle.frag.spv");
         VkShaderModule vertMod = createShaderModule(vert);
         VkShaderModule fragMod = createShaderModule(frag);
 
@@ -363,7 +363,7 @@ private:
         bindings[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
         bindings[1].binding   = 1;
-        bindings[1].stride    = sizeof(EntityInstance);
+        bindings[1].stride    = sizeof(ParticleInstance);
         bindings[1].inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
 
         VkVertexInputAttributeDescription attrs[5]{};
@@ -373,19 +373,19 @@ private:
 
         attrs[1].binding = 1; attrs[1].location = 1;
         attrs[1].format  = VK_FORMAT_R32G32B32_SFLOAT;
-        attrs[1].offset  = offsetof(EntityInstance, worldPos);
+        attrs[1].offset  = offsetof(ParticleInstance, worldPos);
 
         attrs[2].binding = 1; attrs[2].location = 2;
         attrs[2].format  = VK_FORMAT_R32_SFLOAT;
-        attrs[2].offset  = offsetof(EntityInstance, size);
+        attrs[2].offset  = offsetof(ParticleInstance, size);
 
         attrs[3].binding = 1; attrs[3].location = 3;
         attrs[3].format  = VK_FORMAT_R32G32B32A32_SFLOAT;
-        attrs[3].offset  = offsetof(EntityInstance, uv);
+        attrs[3].offset  = offsetof(ParticleInstance, uv);
 
         attrs[4].binding = 1; attrs[4].location = 4;
         attrs[4].format  = VK_FORMAT_R32G32B32A32_SFLOAT;
-        attrs[4].offset  = offsetof(EntityInstance, tint);
+        attrs[4].offset  = offsetof(ParticleInstance, tint);
 
         VkPipelineVertexInputStateCreateInfo vertInput{};
         vertInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -479,7 +479,7 @@ private:
 
         vkDestroyShaderModule(ctx_.device, vertMod, nullptr);
         vkDestroyShaderModule(ctx_.device, fragMod, nullptr);
-        std::cout << "entity pipeline created\n";
+        std::cout << "particle pipeline created\n";
     }
 
     void createDescriptorSetLayout() {
@@ -494,7 +494,7 @@ private:
         info.bindingCount = 1;
         info.pBindings    = &binding;
         if (vkCreateDescriptorSetLayout(ctx_.device, &info, nullptr, &descriptorSetLayout) != VK_SUCCESS)
-            throw std::runtime_error("failed to create entity descriptor set layout");
+            throw std::runtime_error("failed to create particle descriptor set layout");
     }
 
     void createDescriptorPool() {
@@ -508,7 +508,7 @@ private:
         info.pPoolSizes    = &poolSize;
         info.maxSets       = 1;
         if (vkCreateDescriptorPool(ctx_.device, &info, nullptr, &descriptorPool) != VK_SUCCESS)
-            throw std::runtime_error("failed to create entity descriptor pool");
+            throw std::runtime_error("failed to create particle descriptor pool");
     }
 
     void createDescriptorSet() {
@@ -518,7 +518,7 @@ private:
         allocInfo.descriptorSetCount = 1;
         allocInfo.pSetLayouts        = &descriptorSetLayout;
         if (vkAllocateDescriptorSets(ctx_.device, &allocInfo, &descriptorSet) != VK_SUCCESS)
-            throw std::runtime_error("failed to allocate entity descriptor set");
+            throw std::runtime_error("failed to allocate particle descriptor set");
 
         VkDescriptorImageInfo imageInfo{};
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;

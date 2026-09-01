@@ -6,6 +6,7 @@
 #include "vulkan/renderer/chunk_pipeline.hpp"
 #include "vulkan/renderer/ui_pipeline.hpp"
 #include "vulkan/renderer/entity_pipeline.hpp"
+#include "vulkan/renderer/particle_pipeline.hpp"
 #include "core/types.hpp"
 #include "core/config.hpp"
 #include "vulkan/command_manager.hpp"
@@ -28,6 +29,7 @@ public:
         , chunkPipeline_(ctx, swapchain, renderPass_, descriptorSetLayout_.handle, allocator_, commandManager_)
         , uiPipeline_(ctx, swapchain, renderPass_, commandManager_)
         , entityPipeline_(ctx, swapchain, renderPass_, commandManager_)
+        , particlePipeline_(ctx, swapchain, renderPass_, commandManager_)
     {
         createDepthResources();
         createFramebuffers();
@@ -37,6 +39,10 @@ public:
 
     void updateEntityInstances(const std::vector<EntityInstance>& instances) {
         entityPipeline_.updateInstances(instances);
+    }
+
+    void updateParticleInstances(const std::vector<ParticleInstance>& instances) {
+        particlePipeline_.updateInstances(instances);
     }
 
     Slot reserveChunkSlot(const std::vector<uint32_t>& faceData) {
@@ -60,6 +66,7 @@ public:
     void updateUniformBuffer(const glm::mat4& view, const glm::mat4& proj) {
         chunkPipeline_.updateUniformBuffer(view, proj);
         entityPipeline_.updateCamera(view, proj);
+        particlePipeline_.updateCamera(view, proj);
     }
 
     void drawFrame() {
@@ -117,9 +124,11 @@ private:
     PoolAllocator  allocator_;
 
     DescriptorSetLayout descriptorSetLayout_;
+
     ChunkPipeline        chunkPipeline_;
     UiPipeline            uiPipeline_;
     EntityPipeline      entityPipeline_;
+    ParticlePipeline     particlePipeline_;
 
     std::vector<VkFramebuffer>   framebuffers_;
     std::vector<VkCommandBuffer> commandBuffers_;
@@ -184,6 +193,7 @@ private:
         chunkPipeline_.recordRenderEntries(cmd);
         entityPipeline_.recordEntities(cmd);
         uiPipeline_.recordUI(cmd);
+        particlePipeline_.recordParticles(cmd);
 
         vkCmdEndRenderPass(cmd);
         vkEndCommandBuffer(cmd);
