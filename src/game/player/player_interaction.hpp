@@ -12,7 +12,7 @@ public:
         , playerInventory_(playerInventory)
         , arrowManager_(arrowManager)
     {}
-
+ 
     void processInput(const float dt) {
         if (inputManager_.rightClickedOnce()) {
             arrowManager_.spawnArrow(player_.getEyePosition(), player_.orientation);

@@ -35,7 +35,7 @@ enum class Entity : uint32_t {
 struct EntityInstance {
     glm::vec3 worldPos;
     float     size;
-    glm::vec4 rotation;
+    glm::vec4 rotation = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
 };
 
 std::unordered_map<Entity, UVRect> entityAtlasRegions_ = {

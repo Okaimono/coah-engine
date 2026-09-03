@@ -5,7 +5,8 @@
 #include "game/player/player.hpp"
 #include "game/player/player_inventory.hpp"
 #include "game/player/player_interaction.hpp"
-#include "game/entities/arrow_manager.hpp"
+#include "game/particles/particle_manager.hpp"
+#include "game/entities/entity_manager.hpp"
 
 #include "game/block_interaction.hpp"
 #include "game/chunk_mesher.hpp"
@@ -20,8 +21,8 @@ public:
         , chunkMesher_(renderer_, world)
         , blockInteraction_(world, chunkMesher_, inputManager_, player)
         , particleManager_(renderer)
-        , arrowManager_(renderer, particleManager_)
-        , playerInteraction_(inputManager, player, playerInventory_, arrowManager_)
+        , entityManager_(renderer, particleManager_)
+        , playerInteraction_(inputManager, player, playerInventory_, entityManager_.getArrowManager())
     {
         createChunkSlots();
     }
@@ -43,7 +44,8 @@ public:
         playerInteraction_.processInput(dt);
 
         // Update entities (make EntityManager)
-        arrowManager_.updateArrows(dt);
+
+        entityManager_.update(dt);
         particleManager_.updateParticles(dt);
         
         // Update UI (make UIManager here)
@@ -63,7 +65,8 @@ public:
         renderer_.updateUI(uiContext_.getQuadBatch());
 
         // render entities
-        arrowManager_.renderArrows();
+        std::vector<EntityInstance> entityInstances;
+        entityManager_.render();
 
         // render particles
         particleManager_.renderParticles();
@@ -85,7 +88,8 @@ private:
     PlayerInteraction playerInteraction_;
 
     ParticleManager particleManager_;
-    ArrowManager arrowManager_;
+
+    EntityManager entityManager_;
 
     ChunkMesher chunkMesher_;
     BlockInteraction blockInteraction_;

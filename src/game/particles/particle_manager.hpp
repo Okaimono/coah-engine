@@ -13,6 +13,8 @@ float randomFloat(float min, float max) {
     return std::uniform_real_distribution<float>(min, max)(rng);
 }
 
+// Create a effect with typename Derivedd
+
 struct Particle {
     glm::vec3 position;
     glm::vec3 velocity;
