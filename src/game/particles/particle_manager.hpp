@@ -31,7 +31,7 @@ public:
         glm::vec3 dir = glm::normalize(direction);
         glm::vec3 perp = findPerpendicular(dir);
 
-        const int count = 10;
+        const int count = 1;
 
         for (int i = 0; i < count; i++) {
             Particle particle;

@@ -21,7 +21,7 @@ public:
         , chunkMesher_(renderer_, world)
         , blockInteraction_(world, chunkMesher_, inputManager_, player)
         , particleManager_(renderer)
-        , entityManager_(renderer, particleManager_)
+        , entityManager_(renderer, particleManager_, player)
         , playerInteraction_(inputManager, player, playerInventory_, entityManager_.getArrowManager())
     {
         createChunkSlots();

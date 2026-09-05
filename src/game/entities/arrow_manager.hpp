@@ -2,6 +2,7 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtc/quaternion.hpp>
 #include "game/particles/particle_manager.hpp"
+#include "game/entities/entity_id_generator.hpp"
 
 
 // Next, create an EntityManager, which will manage all entities,
@@ -9,9 +10,15 @@
 // then push it into renderer
 
 struct Arrow {
+    uint32_t entityId;
     glm::vec3 position;
     glm::vec3 velocity;
     float lifetime = 3.0f;
+    std::vector<uint32_t> hitSegmentIds;
+
+    void addHitSegmentId(uint32_t id) {
+        hitSegmentIds.push_back(id);
+    }  
 };
 
 // Make some universal particle effect system
@@ -21,12 +28,14 @@ public:
     static constexpr float ARROW_VELOCITY = 100.0f;
     static constexpr float ARROW_SIZE     = 1.5f;
 
-    ArrowManager(ParticleManager& particleManager)
+    ArrowManager(ParticleManager& particleManager, EntityIdGenerator& idGen)
         : particleManager_(particleManager)
+        , idGen_(idGen)
     {}
 
     void spawnArrow(const glm::vec3& origin, const glm::vec3& direction) {
         Arrow arrow;
+        arrow.entityId = idGen_.next();
         arrow.position = origin;
         arrow.velocity = direction * ARROW_VELOCITY;
         arrows_.push_back(arrow);
@@ -68,9 +77,10 @@ public:
         return glm::vec4(q.x, q.y, q.z, q.w);
     }
 
-    const std::vector<Arrow>& getArrows() const { return arrows_; }
+    std::vector<Arrow>& getArrows() { return arrows_; }
 
 private:
     ParticleManager& particleManager_;
+    EntityIdGenerator& idGen_;
     std::vector<Arrow> arrows_;
 };

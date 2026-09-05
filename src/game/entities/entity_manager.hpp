@@ -3,6 +3,9 @@
 #include "game/particles/particle_manager.hpp"
 #include "game/entities/arrow_manager.hpp"
 #include "game/entities/basilisk_manager.hpp"
+#include "game/entities/entity_id_generator.hpp"
+#include "game/player/player.hpp"
+
 
 struct AABB {
     glm::vec3 min;
@@ -22,33 +25,43 @@ inline bool intersects(const AABB& a, const AABB& b) {
 
 class EntityManager {
 public:
-    EntityManager(Renderer& renderer, ParticleManager& particleManager)
+    EntityManager(Renderer& renderer, ParticleManager& particleManager, Player& player)
         : renderer_(renderer)
         , particleManager_(particleManager)
-        , arrowManager_(particleManager)
+        , basiliskManager_(idGen_)
+        , arrowManager_(particleManager, idGen_)
+        , player_(player)
     {}
 
     void update(float dt) {
         arrowManager_.updateArrows(dt);
-        basiliskManager_.updateBasilisk(dt);
+        basiliskManager_.updateBasilisk(dt, player_.position);
         collisions();
     }
 
     void collisions() {
-        const auto& liveArrows     = arrowManager_.getArrows();
-        auto&       basilisks  = basiliskManager_.getBasilisks();
+        auto& liveArrows = arrowManager_.getArrows();
+        auto& basilisks = basiliskManager_.getBasilisks();
 
         for (size_t a = 0; a < liveArrows.size(); ++a) {
-            AABB arrowBox = makeAABB(liveArrows[a].position, ArrowManager::ARROW_SIZE);
+            auto& arrow = liveArrows[a];
+            AABB arrowBox = makeAABB(arrow.position, ArrowManager::ARROW_SIZE);
 
             for (size_t b = 0; b < basilisks.size(); ++b) {
-                auto& segments = basilisks[b].segments;
+                auto& basilisk = basilisks[b];
+                auto& segments = basilisk.segments;
 
                 for (size_t s = 0; s < segments.size(); ++s) {
-                    AABB segBox = makeAABB(segments[s].worldPos, segments[s].size);
+                    auto& segment = segments[s];
+                    AABB segBox = makeAABB(segment.worldPos, segment.size);
 
                     if (intersects(arrowBox, segBox)) {
-                        basiliskManager_.hitDetected(b, s);
+                        bool alreadyHit = std::find(arrow.hitSegmentIds.begin(), arrow.hitSegmentIds.end(),
+                            segment.entityId) != arrow.hitSegmentIds.end();
+                        if (!alreadyHit) {
+                            arrow.addHitSegmentId(segment.entityId);
+                            basilisk.hitDetected();
+                        }
                     }
                 }
             }
@@ -67,7 +80,10 @@ private:
     Renderer& renderer_;
     ParticleManager& particleManager_;
 
+    EntityIdGenerator idGen_;
     ArrowManager arrowManager_;
     BasiliskManager basiliskManager_;
+
+    Player& player_;
     
 };
